@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mark Attendance | Faculty Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        :root {
+            --primary-blue: #0b63e5;
+            --sidebar-dark: #004ecc;
+            --bg-canvas: #f3f6fa;
+            --card-border: #e2e8f0;
+            --text-dark: #0f172a;
+        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg-canvas); color: var(--text-dark); margin: 0; }
+        .app-layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 240px; background: linear-gradient(180deg, var(--primary-blue) 0%, var(--sidebar-dark) 100%); color: #fff; flex-shrink: 0; padding: 20px 14px; display: flex; flex-direction: column; }
+        .brand-box { display: flex; align-items: center; gap: 10px; padding: 8px 10px 24px; font-size: 1.1rem; font-weight: 800; }
+        .brand-icon { width: 34px; height: 34px; background: #fff; color: var(--primary-blue); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+        .nav-item-link { display: flex; align-items: center; gap: 10px; padding: 9px 12px; color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.84rem; font-weight: 500; border-radius: 8px; margin-bottom: 2px; }
+        .nav-item-link:hover, .nav-item-link.active { background: rgba(255,255,255,0.2); color: #fff; }
+        .workspace { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; }
+        .top-bar { height: 64px; background: #fff; border-bottom: 1px solid var(--card-border); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; }
+        .content-area { padding: 24px 32px; }
+        .panel-card { background: #fff; border: 1px solid var(--card-border); border-radius: 14px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .btn-saas-primary { background: #10b981; color: #fff; border: none; font-weight: 600; padding: 8px 20px; border-radius: 8px; }
+        .btn-saas-primary:hover { background: #059669; color: #fff; }
+    </style>
+</head>
+<body>
+
+<div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="brand-box">
+            <div class="brand-icon"><i class="bi bi-mortarboard-fill"></i></div>
+            <span>ACCRA ED</span>
+        </div>
+        <a href="{% url 'dashboard' %}" class="nav-item-link"><i class="bi bi-grid-fill"></i> Dashboard</a>
+        <a href="{% url 'mark_attendance' %}" class="nav-item-link active"><i class="bi bi-calendar2-check-fill"></i> Mark Attendance</a>
+        <div class="mt-auto">
+            <form method="POST" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-light w-100 btn-sm rounded-2">
+                    <i class="bi bi-box-arrow-left me-1"></i> Sign Out
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- Workspace -->
+    <main class="workspace">
+        <header class="top-bar">
+            <div class="small text-muted">
+                Faculty Portal <i class="bi bi-chevron-right mx-1 small"></i> <strong class="text-dark">Mark Attendance</strong>
+            </div>
+            <div class="fw-bold small">{{ user.email }} ({{ user.role }})</div>
+        </header>
+
+        <div class="content-area">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show border-0 shadow-sm mb-4 small" role="alert">
+                        <i class="bi bi-check-circle-fill me-2"></i> {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- Filter Controls -->
+            <div class="panel-card mb-4">
+                <form method="GET" class="row g-3 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label small fw-bold text-muted">Select Course</label>
+                        <select name="course_id" class="form-select">
+                            {% for course in courses %}
+                                <option value="{{ course.id }}" {% if selected_course and selected_course.id == course.id %}selected{% endif %}>
+                                    {{ course.course_code }} - {{ course.course_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Date</label>
+                        <input type="date" name="date" class="form-control" value="{{ selected_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100">Load Roster</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Attendance Table Form -->
+            <div class="panel-card">
+                {% if selected_course %}
+                    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+                        <div>
+                            <h5 class="fw-bold mb-0">{{ selected_course.course_code }}: {{ selected_course.course_name }}</h5>
+                            <small class="text-muted">Date: {{ selected_date }} | {{ enrollments|length }} Enrolled Students</small>
+                        </div>
+                    </div>
+
+                    <form method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="course_id" value="{{ selected_course.id }}">
+                        <input type="hidden" name="date" value="{{ selected_date }}">
+
+                        <div class="table-responsive mb-4">
+                            <table class="table align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Roll Number</th>
+                                        <th>Student Name</th>
+                                        <th>Department</th>
+                                        <th class="text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for enrollment in enrollments %}
+                                    {% with student=enrollment.student %}
+                                    <tr>
+                                        <td class="fw-bold text-primary">{{ student.roll_number }}</td>
+                                        <td class="fw-semibold">{{ student.user.get_full_name|default:student.user.username }}</td>
+                                        <td class="text-muted">{{ student.department }}</td>
+                                        <td class="text-center">
+                                            <div class="btn-group" role="group">
+                                                <input type="radio" class="btn-check" name="status_{{ student.id }}" id="present_{{ student.id }}" value="PRESENT" 
+                                                    {% if existing_attendance|dictsort:student.id or not existing_attendance %}checked{% endif %}>
+                                                <label class="btn btn-outline-success btn-sm" for="present_{{ student.id }}">Present</label>
+
+                                                <input type="radio" class="btn-check" name="status_{{ student.id }}" id="absent_{{ student.id }}" value="ABSENT"
+                                                    {% if existing_attendance and existing_attendance|dictsort:student.id == 'ABSENT' %}checked{% endif %}>
+                                                <label class="btn btn-outline-danger btn-sm" for="absent_{{ student.id }}">Absent</label>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endwith %}
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">No students are currently enrolled in this course.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {% if enrollments %}
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-saas-primary">
+                                <i class="bi bi-check2-circle me-1"></i> Save Attendance
+                            </button>
+                        </div>
+                        {% endif %}
+                    </form>
+                {% else %}
+                    <p class="text-muted text-center py-4">Please create courses and enroll students first.</p>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
